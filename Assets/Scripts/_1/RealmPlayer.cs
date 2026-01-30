@@ -47,6 +47,8 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] bool inPosition;
     [SerializeField] Vector2 stand_StartPos, stand_EndPos;
 
+    [SerializeField] Transform GrabCheckPosition;
+
     [Header("Trampoline")]
 
     [SerializeField] float TrampolineForce;
@@ -199,9 +201,6 @@ public class RealmPlayer : MonoBehaviour
         Color finalColor_1 = Color.Lerp(PlayerStartColor, PlayerEndColor, t);
         fadeIn_PlayerElapsedTime += Time.unscaledDeltaTime;
         transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color = finalColor_1;
-        if(t <= 0)
-        {
-        }
         if(t >= 1)
         {
             dead_time_1 += Time.unscaledDeltaTime;
@@ -342,8 +341,8 @@ public class RealmPlayer : MonoBehaviour
 
     void HandlePandP()
     {
-        RaycastHit2D ray_1 = Physics2D.Raycast(transform.position, Vector2.left, checkLength, mo_layer);
-        RaycastHit2D ray_2 = Physics2D.Raycast(transform.position, Vector2.right, checkLength, mo_layer);
+        RaycastHit2D ray_1 = Physics2D.Raycast(GrabCheckPosition.position, Vector2.left, checkLength, mo_layer);
+        RaycastHit2D ray_2 = Physics2D.Raycast(GrabCheckPosition.position, Vector2.right, checkLength, mo_layer);
         bool is_in_contact = ray_1.collider != null || ray_2.collider != null;    
         Ref_Obj = is_in_contact ? (ray_1.collider != null ? ray_1.collider.gameObject : ray_2.collider.gameObject) : Ref_Obj;
         if (is_in_contact)
@@ -397,6 +396,16 @@ public class RealmPlayer : MonoBehaviour
             if (isKey)
             {
                 int x = Input.GetKey(KeyCode.A) ? -1 : (Input.GetKey(KeyCode.D) ? 1 : 0);
+                transform.eulerAngles = new Vector3(0f, isForward ? 0f : 180f, 0f);
+                Canvas.transform.localEulerAngles = new Vector3(0f, isForward ? 0f : 180f, 0f);
+                is_flipX = isForward;
+
+                //if (Input.GetKey(KeyCode.D))
+                //{
+                //    transform.eulerAngles = new Vector3(0f, 0f, 0f);
+                //    Canvas.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
+                //    is_flipX = false;
+                //}
                 bool can_push = isForward ? (x > 0f ? true : false) : (x < 0f ? true : false);
                 print(can_push);
                 Vector3 offsetValue = (Vector3.right * (can_push ? push_standDistance : pull_standDistance));
@@ -450,13 +459,13 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleMovement()
     {
-        if(!isHoldingSomething)
+        if(!isHoldingSomething && !is_dead)
         {
             x = Input.GetAxis("Horizontal");
             animator.SetBool("isrunning", x != 0f);
         }
 
-        if(!is_swinging)
+        if(!is_swinging && !isHoldingSomething)
         {
             if (x < 0f)
             {
@@ -493,7 +502,7 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleDashing()
     {
-        if (isHoldingSomething || isClicking_MS_Tab || is_swinging) return;
+        if (isHoldingSomething || isClicking_MS_Tab || is_swinging || RealmGameManager.instance.currentRealm != 1) return;
         int x = Input.GetKey(KeyCode.A) ? -1 : (Input.GetKey(KeyCode.D) ? 1 : 0);
         if(Input.GetKeyDown(KeyCode.LeftShift) && !isDashing && x != 0)
         {
@@ -762,6 +771,8 @@ public class RealmPlayer : MonoBehaviour
     private void FixedUpdate()
     {
         isGrounded = Physics2D.OverlapCircle(JumpTransform.position, Jump_CircleRadius, JumpLayer);
+        isGrounded = Physics2D.OverlapBox(JumpTransform.position, new Vector2(Jump_CircleRadius, Jump_CircleRadius / 2), jumpForce);
+        animator.SetBool("canJump", !isGrounded);
         if(isGrounded)
         {
             if (is_dashOver)
@@ -871,10 +882,12 @@ public class RealmPlayer : MonoBehaviour
             rb.linearVelocity = new Vector2(0f, 0f);
             rb.gravityScale = 0f;
             is_dead = true;
+            x = 0f;
+            animator.SetBool("isrunning", false);
             camStartPos = Camera.main.transform.position;
             camEndPos = SafePositionObject.transform.GetChild(0).transform.position;
-            PlayerStartColor = GetComponent<SpriteRenderer>().color;
-            PlayerEndColor = GetComponent<SpriteRenderer>().color;
+            PlayerStartColor = transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color;
+            PlayerEndColor = transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color;
             PlayerStartColor.a = 1;
             PlayerEndColor.a = 0;
         }

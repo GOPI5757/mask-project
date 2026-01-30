@@ -9,6 +9,7 @@ public class TutorialBlock : MonoBehaviour
     [SerializeField] public string TutorialMessage;
 
     [SerializeField] float font_size;
+    [SerializeField] float font_size_title;
 
     [SerializeField] GameObject MajorTutorial, MiniTutorial;
 
@@ -69,6 +70,7 @@ public class TutorialBlock : MonoBehaviour
                 MajorTutorial.transform.GetChild(2).GetComponent<TMP_Text>().text = TutorialMessage;
 
                 MajorTutorial.transform.GetChild(2).GetComponent<TMP_Text>().fontSize = font_size;
+                MajorTutorial.transform.GetChild(1).GetComponent<TMP_Text>().fontSize = font_size_title;
                 Time.timeScale = 0f;
                 if (!player.GetComponent<RealmPlayer>().canPressE)
                 {
