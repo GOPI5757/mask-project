@@ -12,6 +12,8 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] float speed;
     float x;
 
+    [SerializeField] bool is_flipX;
+
     [SerializeField] float initialGravityScale;
 
     Rigidbody2D rb;
@@ -38,6 +40,12 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] float pp_elapsedTime, push_force_changeTime, pull_force_changeTime;
     [SerializeField] LayerMask mo_layer;
     [SerializeField] GameObject Ref_Obj;
+
+    [SerializeField] float pull_standDistance, push_standDistance;
+    [SerializeField] bool hasValuesTaken;
+    [SerializeField] float stand_elapsedTime, initial_to_stand_moveTime;
+    [SerializeField] bool inPosition;
+    [SerializeField] Vector2 stand_StartPos, stand_EndPos;
 
     [Header("Trampoline")]
 
@@ -86,6 +94,7 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] float DashForceDynamic;
     [SerializeField] float DashElapsedTime, DashResetTime;
     [SerializeField] bool isDashing;
+    [SerializeField] bool is_dashOver = false;
     [SerializeField] bool ApplyDash;
 
     [Header("Mask Obtain")]
@@ -137,7 +146,7 @@ public class RealmPlayer : MonoBehaviour
         MaskStartRevealColor = new Color(0, 0, 0, 1);
         MaskEndRevealColor = new Color(1, 1, 1, 1);
 
-        animator = GetComponent<Animator>();
+        animator = transform.GetChild(0).gameObject.GetComponent<Animator>();
     }
 
     void SetMaskShiftInitials()
@@ -189,7 +198,7 @@ public class RealmPlayer : MonoBehaviour
         float t = fadeIn_PlayerElapsedTime / fadeIn_Time;
         Color finalColor_1 = Color.Lerp(PlayerStartColor, PlayerEndColor, t);
         fadeIn_PlayerElapsedTime += Time.unscaledDeltaTime;
-        GetComponent<SpriteRenderer>().color = finalColor_1;
+        transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color = finalColor_1;
         if(t <= 0)
         {
         }
@@ -214,7 +223,7 @@ public class RealmPlayer : MonoBehaviour
                         Color finalColor_2 = Color.Lerp(PlayerEndColor, PlayerStartColor, t_2);
                         fadeOut_PlayerElapsedTime += Time.unscaledDeltaTime;
 
-                        GetComponent<SpriteRenderer>().color = finalColor_2;
+                        transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color = finalColor_2;
                         if (t_2 >= 1)
                         {
                             is_dead = false;
@@ -286,6 +295,7 @@ public class RealmPlayer : MonoBehaviour
             if(Input.GetKeyDown(KeyCode.E))
             {
                 x = 0f;
+                animator.SetBool("isrunning", false);
                 SetMaskShiftInitials();
                 is_obtaining_Mask = true;
                 if(CurrentMaskToReveal)
@@ -341,22 +351,21 @@ public class RealmPlayer : MonoBehaviour
             isForward = ray_2.collider != null;
             if(Input.GetMouseButtonDown(1))
             {
-                //animator.SetBool("push_idle", true);
                 isHoldingSomething = true;
                 Ref_Obj.GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeRotation;
                 FixedJoint2D joint = Ref_Obj.AddComponent<FixedJoint2D>();
                 joint.connectedBody = rb;
                 joint.enableCollision = false;
             }
-            if(Input.GetMouseButton(1))
-            {
-                //animator.SetBool("canPush", rb.linearVelocityX != 0);
-            }
+
             if (Input.GetMouseButtonUp(1))
             {
-                animator.SetBool("push_idle", false);
                 animator.SetBool("canPush", false);
+                animator.SetBool("canPull", false);
                 isHoldingSomething = false;
+                hasValuesTaken = false;
+                inPosition = false;
+                stand_elapsedTime = 0f;
                 main_force_value = 0f;
                 if(Ref_Obj)
                 {
@@ -369,8 +378,12 @@ public class RealmPlayer : MonoBehaviour
         } else
         {
             animator.SetBool("canPush", false);
+            animator.SetBool("canPull", false);
             isHoldingSomething = false;
-            if(Ref_Obj)
+            hasValuesTaken = false;
+            inPosition = false;
+            stand_elapsedTime = 0f;
+            if (Ref_Obj)
             {
                 Ref_Obj.GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeAll;
             }
@@ -384,26 +397,52 @@ public class RealmPlayer : MonoBehaviour
             if (isKey)
             {
                 int x = Input.GetKey(KeyCode.A) ? -1 : (Input.GetKey(KeyCode.D) ? 1 : 0);
-                animator.SetBool("canPush", (isForward ? (x > 0f ? true : false) : (x < 0f ? true : false)));
-                animator.SetBool("canPull", (isForward ? (x < 0f ? true : false) : (x > 0f ? true : false)));
+                bool can_push = isForward ? (x > 0f ? true : false) : (x < 0f ? true : false);
+                print(can_push);
+                Vector3 offsetValue = (Vector3.right * (can_push ? push_standDistance : pull_standDistance));
+                if (!hasValuesTaken)
+                {
+                    stand_StartPos = transform.position;
+                    stand_EndPos = new Vector3(Ref_Obj.transform.position.x, transform.position.y, transform.position.z) + (isForward ? -offsetValue : offsetValue);
+                    hasValuesTaken = true;
+                } else if(!inPosition)
+                {
+                    float t_stand = stand_elapsedTime / initial_to_stand_moveTime;
+                    Vector3 newPosition = Vector3.Lerp(stand_StartPos, stand_EndPos, t_stand);
+                    stand_elapsedTime += Time.unscaledDeltaTime;
+                    transform.position = newPosition;
 
-                //animator.SetBool
-                float t = pp_elapsedTime /
-                    (Input.GetKey(KeyCode.A) ?
-                    (isForward ? pull_force_changeTime : push_force_changeTime) :
-                    (isForward ? push_force_changeTime : pull_force_changeTime));
-                main_force_value = Mathf.Lerp(
-                    neutral_force_value, 
-                    (isForward ? (x < 0 ? pullForce : x > 0 ? pushForce : 0) : (x < 0 ? -pushForce : x > 0 ? -pullForce : 0)), 
-                    t
-                );
-                pp_elapsedTime += Time.deltaTime;
+                    if(t_stand >= 1)
+                    {
+                        inPosition = true;
+                    }
+                }
+                if (inPosition)
+                {
+                    animator.SetBool("canPush", (isForward ? (x > 0f ? true : false) : (x < 0f ? true : false)));
+                    animator.SetBool("canPull", (isForward ? (x < 0f ? true : false) : (x > 0f ? true : false)));
+
+                    float t = pp_elapsedTime /
+                        (Input.GetKey(KeyCode.A) ?
+                        (isForward ? pull_force_changeTime : push_force_changeTime) :
+                        (isForward ? push_force_changeTime : pull_force_changeTime));
+                    main_force_value = Mathf.Lerp(
+                        neutral_force_value,
+                        (isForward ? (x < 0 ? pullForce : x > 0 ? pushForce : 0) : (x < 0 ? -pushForce : x > 0 ? -pullForce : 0)),
+                        t
+                    );
+                    pp_elapsedTime += Time.deltaTime;
+                }
             } else
             {
                 animator.SetBool("canPush", false);
                 animator.SetBool("canPull", false);
                 pp_elapsedTime = 0f;
                 main_force_value = 0f;
+
+                hasValuesTaken = false;
+                inPosition = false;
+                stand_elapsedTime = 0f;
             }
         }
 
@@ -416,17 +455,25 @@ public class RealmPlayer : MonoBehaviour
             x = Input.GetAxis("Horizontal");
             animator.SetBool("isrunning", x != 0f);
         }
-        if(x < 0f)
-        {
-            transform.eulerAngles = new Vector3(0f, 180f, 0f);
-            Canvas.transform.localEulerAngles = new Vector3(0f, 180f, 0f);
-        } 
 
-        if(x > 0f)
+        if(!is_swinging)
         {
-            transform.eulerAngles = new Vector3(0f, 0f, 0f);
-            Canvas.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
+            if (x < 0f)
+            {
+                transform.eulerAngles = new Vector3(0f, 180f, 0f);
+                Canvas.transform.localEulerAngles = new Vector3(0f, 180f, 0f);
+                is_flipX = true;
+            }
+
+            if (x > 0f)
+            {
+                transform.eulerAngles = new Vector3(0f, 0f, 0f);
+                Canvas.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
+                is_flipX = false;
+            }
         }
+
+
         if(Input.GetKeyDown(KeyCode.Space) && !is_wall)
         {   
             if(canDo_DoubleJump)
@@ -446,7 +493,7 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleDashing()
     {
-        if (isHoldingSomething || isClicking_MS_Tab || is_swinging || RealmGameManager.instance.currentRealm != 1) return;
+        if (isHoldingSomething || isClicking_MS_Tab || is_swinging) return;
         int x = Input.GetKey(KeyCode.A) ? -1 : (Input.GetKey(KeyCode.D) ? 1 : 0);
         if(Input.GetKeyDown(KeyCode.LeftShift) && !isDashing && x != 0)
         {
@@ -455,6 +502,9 @@ public class RealmPlayer : MonoBehaviour
                 DashForce = -DashForce;
             }
             isDashing = true;
+            animator.SetBool("canDash", true);
+            rb.gravityScale = 0f;
+            rb.linearVelocityY = 0f;
         }
 
         if(isDashing)
@@ -464,9 +514,9 @@ public class RealmPlayer : MonoBehaviour
             DashElapsedTime += Time.deltaTime;
             if(t >= 1)
             {
-                DashElapsedTime = 0f;
-                isDashing = false;
+                is_dashOver = true;
                 DashForce = Mathf.Abs(DashForce);
+                rb.gravityScale = initialGravityScale;
             }
         }
     }
@@ -534,6 +584,7 @@ public class RealmPlayer : MonoBehaviour
                 canSwing = false;
                 swing_elapsedTime = 0f;
                 DJ_2D = transform.AddComponent<DistanceJoint2D>();
+                //DJ_2D.anchor = SwingAttachPointTransform.localPosition;
                 DJ_2D.connectedAnchor = new Vector2(swing_bar_pos.x, swing_bar_pos.y + swingbarOffset);
                 DJ_2D.autoConfigureDistance = false;
                 DJ_2D.distance = swing_distance;
@@ -545,9 +596,10 @@ public class RealmPlayer : MonoBehaviour
 
         if(is_swinging)
         {
+            //rb.linearVelocity = new Vector2(0f, 0f);
             Vector2 distance = (SwingBarObject.transform.position - transform.position).normalized;
             float z_deg = Mathf.Atan2(distance.y, distance.x) * Mathf.Rad2Deg;
-            transform.eulerAngles = new Vector3(0f, 0f, z_deg);
+            transform.eulerAngles = new Vector3(transform.eulerAngles.x, transform.eulerAngles.y, (z_deg - 90f) * (is_flipX ? -1 : 1));
         }
     }
 
@@ -568,19 +620,30 @@ public class RealmPlayer : MonoBehaviour
         {
             Time.timeScale = 1f;
             x = 0f;
-            if (RealmGameManager.instance.nextRealm != -1)
+            if(!RealmGameManager.instance.HasChanged)
             {
-                if(RealmGameManager.instance.currentRealm != RealmGameManager.instance.nextRealm)
+                if (RealmGameManager.instance.nextRealm != -1)
                 {
-                    RealmGameManager.instance.ConfirmRealm();
+                    if(RealmGameManager.instance.currentRealm != RealmGameManager.instance.nextRealm)
+                    {
+                        RealmGameManager.instance.ConfirmRealm();
+                    }
+                } else
+                {
+                    if(RealmGameManager.instance.prev_realm != 0)
+                    {
+                        RealmGameManager.instance.nextRealm = RealmGameManager.instance.prev_realm;
+                        RealmGameManager.instance.ConfirmRealm();
+                    }
                 }
             } else
             {
-                if(RealmGameManager.instance.prev_realm != 0)
-                {
-                    RealmGameManager.instance.nextRealm = RealmGameManager.instance.prev_realm;
-                    RealmGameManager.instance.ConfirmRealm();
-                }
+                int temp = RealmGameManager.instance.currentRealm;
+                RealmGameManager.instance.currentRealm = RealmGameManager.instance.nextRealm;
+                RealmGameManager.instance.nextRealm = temp;
+                RealmGameManager.instance.HasChanged = false;
+                RealmGameManager.instance.BG_ElapsedTime = 0f;
+                RealmGameManager.instance.ConfirmRealm();
             }
             MS_ElapsedTime = 0f;
             isClicking_MS_Tab = false;
@@ -699,6 +762,16 @@ public class RealmPlayer : MonoBehaviour
     private void FixedUpdate()
     {
         isGrounded = Physics2D.OverlapCircle(JumpTransform.position, Jump_CircleRadius, JumpLayer);
+        if(isGrounded)
+        {
+            if (is_dashOver)
+            {
+                isDashing = false;
+                animator.SetBool("canDash", false);
+                is_dashOver = false;
+                DashElapsedTime = 0f;
+            }
+        }
         if(!canSwing && !is_swinging && !isDashing && !is_wall)
         {
             if (!isHoldingSomething)

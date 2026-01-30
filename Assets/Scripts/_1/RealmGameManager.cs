@@ -42,7 +42,7 @@ public class RealmGameManager : MonoBehaviour
     
     [SerializeField]
     GameObject[] Background_Textues;
-    [SerializeField] float BG_ElapsedTime;
+    [SerializeField] public float BG_ElapsedTime;
 
     [SerializeField] BG_Tex_Data[] BGT_Datas;
 
