@@ -17,6 +17,8 @@ TagManager:
   - TutorialBlock
   - Death
   - safePoint
+  - reset_block
+  - finishDoor
   layers:
   - Default
   - TransparentFX
@@ -26,7 +28,7 @@ TagManager:
   - UI
   - mov_obj
   - wall
-  - 
+  - player
   - 
   - 
   - 

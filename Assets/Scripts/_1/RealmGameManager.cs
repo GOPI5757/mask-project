@@ -1,6 +1,8 @@
 using NUnit.Framework.Constraints;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 [System.Serializable]
@@ -52,8 +54,23 @@ public class RealmGameManager : MonoBehaviour
 
     [SerializeField] public int masks_unlocked;
 
+    [Header("Slow motion Toggle")]
+
+    [SerializeField] float blur_value_low, blur_value_high;
+    [SerializeField] Color normalColor, blurColor;
+    [SerializeField] float smt_elapsedTime, smt_transitionTime;
+
+    [SerializeField] bool is_toggling_slowMode;
+    [SerializeField] bool is_toggling_backwards;
+
     [SerializeField]
     public bool is_slow_Toggled;
+
+    [SerializeField]
+    Volume Global_Volume;
+
+    [SerializeField] DepthOfField depthOf_field;
+    [SerializeField] ColorAdjustments color_Adjustment;
 
     public static RealmGameManager instance;
 
@@ -74,6 +91,9 @@ public class RealmGameManager : MonoBehaviour
             Background_Textues[i].GetComponent<SpriteRenderer>().sprite = BGT_Datas[currentRealm].color_sprites[(Background_Textues[i].gameObject.name[1] - '0') - 1];
         }
 
+        Global_Volume.profile.TryGet<DepthOfField>(out depthOf_field);
+        Global_Volume.profile.TryGet<ColorAdjustments>(out color_Adjustment);
+
         //Time.timeScale = 0.2f;
     }
 
@@ -81,6 +101,7 @@ public class RealmGameManager : MonoBehaviour
     {
         HandleChange();
         HandleSlowToggle();
+        HandleSMT();
     }
 
     void HandleChange()
@@ -183,6 +204,9 @@ public class RealmGameManager : MonoBehaviour
 
                 if(currentRealm != 2)
                 {
+                    is_slow_Toggled = false;
+                    depthOf_field.focalLength.value = blur_value_low;
+                    color_Adjustment.colorFilter.value = normalColor;
                     BlockSpawner[] b_spawners = FindObjectsByType<BlockSpawner>(FindObjectsSortMode.None);
                     for (int i = 0; i < b_spawners.Length; i++)
                     {
@@ -217,23 +241,51 @@ public class RealmGameManager : MonoBehaviour
         }
     }
 
+    void HandleSMT()
+    {
+        if (!is_toggling_slowMode) return;
+        float t = smt_elapsedTime / smt_transitionTime;
+        float newValue = Mathf.Lerp(
+            is_slow_Toggled ? blur_value_low : blur_value_high, 
+            is_slow_Toggled ? blur_value_high : blur_value_low, 
+            t
+        );
+
+        Color newColor = Color.Lerp(
+            is_slow_Toggled ? normalColor : blurColor,
+            is_slow_Toggled ? blurColor : normalColor,
+            t
+        );
+        smt_elapsedTime += Time.deltaTime;
+
+        depthOf_field.focalLength.value = newValue;
+        color_Adjustment.colorFilter.value = newColor;
+
+        if(t >= 1)
+        {
+            is_toggling_slowMode = false;
+            smt_elapsedTime = 0f;
+        }
+    }
+
     void HandleSlowToggle()
     {
-        if (currentRealm != 2) return;
+        if (currentRealm != 2 || is_toggling_slowMode) return;
         if(Input.GetKeyDown(KeyCode.T))
         {
             is_slow_Toggled = !is_slow_Toggled;
+            is_toggling_slowMode = true;
             BlockSpawner[] b_spawners = FindObjectsByType<BlockSpawner>(FindObjectsSortMode.None);
             for(int i = 0; i < b_spawners.Length; i++)
             {
-                b_spawners[i].is_slow = !b_spawners[i].is_slow;
+                b_spawners[i].is_slow = is_slow_Toggled;
                 b_spawners[i].main_time = 0f + (b_spawners[i].is_opp ? b_spawners[i].TimeBetweenSpawn / 2 : 0);
             }
 
             FallingBlock[] falling_blocks = FindObjectsByType<FallingBlock>(FindObjectsSortMode.None);
             for(int i = 0; i < falling_blocks.Length; i++)
             {
-                falling_blocks[i].is_slow = !falling_blocks[i].is_slow;
+                falling_blocks[i].is_slow = is_slow_Toggled;
             }
         }
     }

@@ -150,6 +150,33 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] float dead_time_2, spawn_wait_time;
     [SerializeField] float fadeOut_PlayerElapsedTime, fadeOut_Time;
 
+    [Header("Wall Climb")]
+
+    [SerializeField] bool should_climb_wall, isClimbing;
+    [SerializeField] float x_offset;
+    [SerializeField] Vector2 climbStartPos, climbEndPos;
+    [SerializeField] float climb_elapsedTime, climb_Time;
+    [SerializeField] float climbForce;
+
+    [Header("Game Start")]
+
+    [SerializeField] bool hasGameStarted = false;
+    [SerializeField] Image FadeOutImage;
+    [SerializeField] float fadeOut_elapsedTime, fadeOutTime_GS;
+    [SerializeField] float gs_time_1, gs_wait_time_1;
+    [SerializeField] float playerFadeIn_elapsedTime, fadeinTime_GS;
+    [SerializeField] float gs_time_2, gs_wait_time_2;
+    [SerializeField] float gs_startCamSize, gs_endCamSize;
+    [SerializeField] float camSize_elapsedTime_gs, camSize_time_gs;
+    [SerializeField] float gs_time_3, gs_wait_time_3;
+
+    [Header("GameFinish")]
+
+    [SerializeField] bool hasGameFinished = false;
+    [SerializeField] float GameFinish_time_1, GameFinish_wait_time_1;
+    [SerializeField] Vector3 GameFinish_camStartPos, GameFinish_camEndPos;
+    [SerializeField] float GameFinishElapsedTime, GameFinishTime;
+
     private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -162,6 +189,12 @@ public class RealmPlayer : MonoBehaviour
 
         initialBoxColliderX_Size = GetComponent<BoxCollider2D>().size.y;
         initialSpritePosition = transform.GetChild(0).transform.localPosition;
+        if(!hasGameStarted)
+        {
+            FadeOutImage.gameObject.SetActive(true);
+            Camera.main.orthographicSize = gs_startCamSize;
+        }
+
     }
 
     void SetMaskShiftInitials()
@@ -183,28 +216,116 @@ public class RealmPlayer : MonoBehaviour
 
     private void Update()
     {
-        if(!isClicking_MS_Tab && !isDashing && !is_obtaining_Mask)
+        if(hasGameStarted)
         {
-            HandleMovement();
-            HandleInputs();
-            HandleSwinging();
+            if (!isClicking_MS_Tab && !isDashing && !is_obtaining_Mask)
+            {
+                HandleMovement();
+                HandleInputs();
+                HandleSwinging();
+            }
+            HandleMaskShifting();
+            HandlePandP();
+            HandleCamera();
+            HandleDashing();
+            HandleMaskObtaining();
+            HandleDoubleJump();
+            HandleWallJump();
+            HandleCanHoldWall();
+            HandleTutorialFadeOut();
+            HandleDead();
+            HandleWallJump();
+            HandleWallClimb();
         }
-        HandleMaskShifting();
-        HandlePandP();
-        HandleCamera();
-        HandleDashing();
-        HandleMaskObtaining();
-        HandleDoubleJump();
-        HandleWallJump();
-        HandleCanHoldWall();
-        HandleTutorialFadeOut();
-        HandleDead();
+        HandleHasGameStarted();
+        HandleGameFinish();
     }
 
     private void LateUpdate()
     {
-        if (is_dead) return;
+        if (is_dead || hasGameFinished) return;
         Camera.main.transform.position = new Vector3(transform.position.x, transform.position.y, -10f);
+    }
+
+    void HandleGameFinish()
+    {
+        if(hasGameFinished)
+        {
+            GameFinish_time_1 += Time.deltaTime;
+            if(GameFinish_time_1 >= GameFinish_wait_time_1)
+            {
+                rb.gravityScale = 0f;
+                GetComponent<BoxCollider2D>().enabled = false;
+
+                float t = GameFinishElapsedTime / GameFinishTime;
+                Vector3 newCamPos = Vector3.Lerp(GameFinish_camStartPos, GameFinish_camEndPos, t);
+                Camera.main.transform.position = newCamPos;
+                rb.linearVelocityX = speed;
+                animator.SetBool("isrunning", true);
+
+                GameFinishElapsedTime += Time.deltaTime;
+
+                if(t >= 1f)
+                {
+
+                }
+            }
+        }
+    }
+
+    void HandleHasGameStarted()
+    {
+        if(!hasGameStarted)
+        {
+            float t = fadeOut_elapsedTime / fadeOutTime_GS;
+            Color newColor = Color.Lerp(new Color(0, 0, 0, 1), new Color(0, 0, 0, 0), t);
+            fadeOut_elapsedTime += Time.deltaTime;
+            FadeOutImage.color = newColor;
+            if(t >= 1)
+            {
+                gs_time_1 += Time.deltaTime;
+                if(gs_time_1 >= gs_wait_time_1)
+                {
+                    float t_1 = playerFadeIn_elapsedTime / fadeinTime_GS;
+                    Color newColor_1 = Color.Lerp(new Color(1, 1, 1, 0), new Color(1, 1, 1, 1), t_1);
+                    transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color = newColor_1;
+
+                    playerFadeIn_elapsedTime += Time.deltaTime;
+                    if(t_1 >= 1f)
+                    {
+                        gs_time_2 += Time.deltaTime;
+                        if(gs_time_2 >= gs_wait_time_2)
+                        {
+                            float t_2 = camSize_elapsedTime_gs / camSize_time_gs;
+                            float newCamSize = Mathf.Lerp(gs_startCamSize, gs_endCamSize, t_2);
+                            Camera.main.orthographicSize = newCamSize;
+                            
+                            camSize_elapsedTime_gs += Time.deltaTime;
+                            if(t_2 >= 1f)
+                            {
+                                gs_time_3 += Time.deltaTime;
+                                if(gs_time_3 >= gs_wait_time_3)
+                                {
+                                    Destroy(FadeOutImage.gameObject);
+                                    gs_time_1 = 0f;
+                                    gs_time_2 = 0f;
+                                    gs_time_1 = 3f;
+                                    fadeOut_elapsedTime = 0f;
+                                    playerFadeIn_elapsedTime = 0f;
+                                    camSize_elapsedTime_gs = 0f;
+                                    hasGameStarted = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void HandleWallClimb()
+    {
+
     }
 
     void HandleDead()
@@ -385,7 +506,13 @@ public class RealmPlayer : MonoBehaviour
                     FixedJoint2D joint = Ref_Obj.GetComponent<FixedJoint2D>();
                     if (joint) Destroy(joint);
                 }
-                Ref_Obj.GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeAll;
+                RealmData rd;
+                Ref_Obj.TryGetComponent<RealmData>(out rd);
+                Ref_Obj.GetComponent<Rigidbody2D>().constraints = (rd != null ? 
+                    (rd.canFall ? 
+                    RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezeRotation : RigidbodyConstraints2D.FreezeAll) :
+                    RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezeRotation
+                ); 
             }
         } else
         {
@@ -397,7 +524,13 @@ public class RealmPlayer : MonoBehaviour
             stand_elapsedTime = 0f;
             if (Ref_Obj)
             {
-                Ref_Obj.GetComponent<Rigidbody2D>().constraints = RigidbodyConstraints2D.FreezeAll;
+                RealmData rd;
+                Ref_Obj.TryGetComponent<RealmData>(out rd);
+                Ref_Obj.GetComponent<Rigidbody2D>().constraints = (rd != null ?
+                    (rd.canFall ?
+                    RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezeRotation : RigidbodyConstraints2D.FreezeAll) :
+                    RigidbodyConstraints2D.FreezePositionX | RigidbodyConstraints2D.FreezeRotation
+                );
             }
             Ref_Obj = null;
         }
@@ -413,14 +546,7 @@ public class RealmPlayer : MonoBehaviour
                 Canvas.transform.localEulerAngles = new Vector3(0f, isForward ? 0f : 180f, 0f);
                 is_flipX = isForward;
 
-                //if (Input.GetKey(KeyCode.D))
-                //{
-                //    transform.eulerAngles = new Vector3(0f, 0f, 0f);
-                //    Canvas.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
-                //    is_flipX = false;
-                //}
                 bool can_push = isForward ? (x > 0f ? true : false) : (x < 0f ? true : false);
-                print(can_push);
                 Vector3 offsetValue = (Vector3.right * (can_push ? push_standDistance : pull_standDistance));
                 if (!hasValuesTaken)
                 {
@@ -472,7 +598,7 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleMovement()
     {
-        if(!isHoldingSomething && !is_dead)
+        if(!isHoldingSomething && !is_dead && !hasGameFinished)
         {
             x = Input.GetAxis("Horizontal");
             animator.SetBool("isrunning", x != 0f);
@@ -789,6 +915,7 @@ public class RealmPlayer : MonoBehaviour
 
     private void FixedUpdate()
     {
+        if (hasGameFinished) return;
         isGrounded = Physics2D.OverlapCircle(JumpTransform.position, Jump_CircleRadius, JumpLayer);
         //isGrounded = Physics2D.OverlapBox(JumpTransform.position, new Vector2(Jump_CircleRadius, Jump_CircleRadius / 2), jumpForce);
         animator.SetBool("canJump", !isGrounded);
@@ -917,6 +1044,16 @@ public class RealmPlayer : MonoBehaviour
         if(collision.gameObject.tag == "safePoint")
         {
             SafePositionObject = collision.gameObject;
+        }
+
+        if(collision.gameObject.tag == "finishDoor")
+        {
+            hasGameFinished = true;
+            animator.SetBool("isrunning", false);
+            rb.linearVelocityX = 0f;
+            GameFinish_camStartPos = Camera.main.transform.position;
+            GameFinish_camEndPos = new Vector3(collision.gameObject.transform.parent.transform.GetChild(1).transform.position.x, Camera.main.transform.position.y, -10f);
+            x = 0f;
         }
     }
 
