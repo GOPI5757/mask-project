@@ -72,8 +72,14 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] DistanceJoint2D DJ_2D;
     [SerializeField] float swingbarOffset;
     [SerializeField] float swing_distance;
+    [SerializeField] float anchorX_offset, anchorY_offset;
+
     [SerializeField] float SwingJumpForce;
     [SerializeField] GameObject SwingBarObject;
+
+    [SerializeField] float connectedAnchorY_offset;
+    [SerializeField] Vector2 initialSpritePosition;
+    [SerializeField] Vector2 swingSpritePosition;
 
     [Header("Mask Shift")]
 
@@ -99,6 +105,8 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] bool is_dashOver = false;
     [SerializeField] bool ApplyDash;
 
+    [SerializeField] float initialBoxColliderX_Size;
+
     [Header("Mask Obtain")]
 
     [SerializeField] bool is_insideMaskBounds, is_obtaining_Mask, canRevealMaskUI, canRevealActiveMask;
@@ -122,6 +130,8 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] float wall_time, wall_friction_time;
     [SerializeField] bool canHoldWall = true;
     [SerializeField] Vector2 wall_jumpForce;
+
+    [SerializeField] LayerMask WallLayer;
 
     [Header("Tutorial")]
 
@@ -147,8 +157,11 @@ public class RealmPlayer : MonoBehaviour
         SetMaskShiftInitials();
         MaskStartRevealColor = new Color(0, 0, 0, 1);
         MaskEndRevealColor = new Color(1, 1, 1, 1);
-
+        //Time.timeScale = 0.2f;
         animator = transform.GetChild(0).gameObject.GetComponent<Animator>();
+
+        initialBoxColliderX_Size = GetComponent<BoxCollider2D>().size.y;
+        initialSpritePosition = transform.GetChild(0).transform.localPosition;
     }
 
     void SetMaskShiftInitials()
@@ -467,23 +480,26 @@ public class RealmPlayer : MonoBehaviour
 
         if(!is_swinging && !isHoldingSomething)
         {
-            if (x < 0f)
+            if(!is_wall)
             {
-                transform.eulerAngles = new Vector3(0f, 180f, 0f);
-                Canvas.transform.localEulerAngles = new Vector3(0f, 180f, 0f);
-                is_flipX = true;
-            }
+                if (x < 0f)
+                {
+                    transform.eulerAngles = new Vector3(0f, 180f, 0f);
+                    Canvas.transform.localEulerAngles = new Vector3(0f, 180f, 0f);
+                    is_flipX = true;
+                }
 
-            if (x > 0f)
-            {
-                transform.eulerAngles = new Vector3(0f, 0f, 0f);
-                Canvas.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
-                is_flipX = false;
+                if (x > 0f)
+                {
+                    transform.eulerAngles = new Vector3(0f, 0f, 0f);
+                    Canvas.transform.localEulerAngles = new Vector3(0f, 0f, 0f);
+                    is_flipX = false;
+                }
             }
         }
 
 
-        if(Input.GetKeyDown(KeyCode.Space) && !is_wall)
+        if(Input.GetKeyDown(KeyCode.Space) && !is_wall && !isHoldingSomething)
         {   
             if(canDo_DoubleJump)
             {
@@ -512,6 +528,7 @@ public class RealmPlayer : MonoBehaviour
             }
             isDashing = true;
             animator.SetBool("canDash", true);
+            GetComponent<BoxCollider2D>().size = new Vector2(GetComponent<BoxCollider2D>().size.x, initialBoxColliderX_Size / 2);
             rb.gravityScale = 0f;
             rb.linearVelocityY = 0f;
         }
@@ -569,6 +586,7 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleSwinging()
     {
+        animator.SetBool("canSwing", is_swinging);
         if(is_insideSwingBounds)
         {
             if(Input.GetMouseButtonDown(1))
@@ -593,8 +611,9 @@ public class RealmPlayer : MonoBehaviour
                 canSwing = false;
                 swing_elapsedTime = 0f;
                 DJ_2D = transform.AddComponent<DistanceJoint2D>();
-                //DJ_2D.anchor = SwingAttachPointTransform.localPosition;
-                DJ_2D.connectedAnchor = new Vector2(swing_bar_pos.x, swing_bar_pos.y + swingbarOffset);
+                DJ_2D.anchor = new Vector2(anchorX_offset, anchorY_offset);
+                DJ_2D.connectedAnchor = new Vector2(swing_bar_pos.x, (swing_bar_pos.y + swingbarOffset) - connectedAnchorY_offset);
+                transform.GetChild(0).transform.localPosition = swingSpritePosition;
                 DJ_2D.autoConfigureDistance = false;
                 DJ_2D.distance = swing_distance;
                 DJ_2D.enableCollision = true;
@@ -771,13 +790,14 @@ public class RealmPlayer : MonoBehaviour
     private void FixedUpdate()
     {
         isGrounded = Physics2D.OverlapCircle(JumpTransform.position, Jump_CircleRadius, JumpLayer);
-        isGrounded = Physics2D.OverlapBox(JumpTransform.position, new Vector2(Jump_CircleRadius, Jump_CircleRadius / 2), jumpForce);
+        //isGrounded = Physics2D.OverlapBox(JumpTransform.position, new Vector2(Jump_CircleRadius, Jump_CircleRadius / 2), jumpForce);
         animator.SetBool("canJump", !isGrounded);
         if(isGrounded)
         {
             if (is_dashOver)
             {
                 isDashing = false;
+                GetComponent<BoxCollider2D>().size = new Vector2(GetComponent<BoxCollider2D>().size.x, initialBoxColliderX_Size);
                 animator.SetBool("canDash", false);
                 is_dashOver = false;
                 DashElapsedTime = 0f;
@@ -821,6 +841,7 @@ public class RealmPlayer : MonoBehaviour
                 space_clicked = false;
                 is_insideSwingBounds = false;
                 is_swinging = false;
+                transform.GetChild(0).transform.localPosition = initialSpritePosition;
                 rb.gravityScale = initialGravityScale;
                 rb.AddForceY(SwingJumpForce, ForceMode2D.Impulse);
                 Destroy(DJ_2D);
@@ -838,6 +859,7 @@ public class RealmPlayer : MonoBehaviour
         if(collision.gameObject.tag == "tramp")
         {
             Is_Trampoline = true;
+            TrampolineForce = collision.gameObject.GetComponent<Trampoline>().trampolineForce;
         }
 
         if (collision.gameObject.tag == "CamZones")
@@ -929,7 +951,15 @@ public class RealmPlayer : MonoBehaviour
             is_wall = true;
             rb.linearVelocityY = 0f;
             rb.gravityScale = 0f;
-            if (jumpIndex >= maxJumps) { jumpIndex = 0; }        
+            if (jumpIndex >= maxJumps) { jumpIndex = 0; }
+            animator.SetBool("canWallGrab", true);
+            RaycastHit2D ray_1 = Physics2D.Raycast(GrabCheckPosition.position, Vector2.left, checkLength, WallLayer);
+            RaycastHit2D ray_2 = Physics2D.Raycast(GrabCheckPosition.position, Vector2.right, checkLength, WallLayer);
+            transform.eulerAngles = new Vector3(0f, ray_2.collider != null ? 180f : 0f, 0f);
+            Canvas.transform.localEulerAngles = new Vector3(0f, ray_2.collider != null ? 180f : 0f, 0f);
+            if(ray_1.collider != null) print("Ray_1 : " + ray_1.collider.gameObject.name);
+            if (ray_2.collider != null) print("Ray_2 : " + ray_2.collider.gameObject.name);
+            is_flipX = ray_2.collider != null;
         }
     }
 
@@ -938,6 +968,7 @@ public class RealmPlayer : MonoBehaviour
         if(collision.gameObject.tag == "wall" && is_wall)
         {
             StartCoroutine(SetIsWall());
+            animator.SetBool("canWallGrab", false);
         }
     }
 

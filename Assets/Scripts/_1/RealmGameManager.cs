@@ -180,6 +180,22 @@ public class RealmGameManager : MonoBehaviour
                 prev_realm = currentRealm;
                 currentRealm = nextRealm;
                 nextRealm = -1;
+
+                if(currentRealm != 2)
+                {
+                    BlockSpawner[] b_spawners = FindObjectsByType<BlockSpawner>(FindObjectsSortMode.None);
+                    for (int i = 0; i < b_spawners.Length; i++)
+                    {
+                        b_spawners[i].is_slow = false;
+                        //b_spawners[i].main_time = 0f + (b_spawners[i].is_opp ? b_spawners[i].TimeBetweenSpawn / 2 : 0);
+                    }
+
+                    FallingBlock[] falling_blocks = FindObjectsByType<FallingBlock>(FindObjectsSortMode.None);
+                    for (int i = 0; i < falling_blocks.Length; i++)
+                    {
+                        falling_blocks[i].is_slow = false;
+                    }
+                }
                 is_fading = true;
             }
 
