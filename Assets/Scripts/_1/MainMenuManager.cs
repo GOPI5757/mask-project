@@ -20,9 +20,13 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] float closeElapsedTime, closeTime, time_1, wait_time;
     [SerializeField] bool shouldClose;
 
-    [SerializeField] GameObject MenuPanel, CreditsPanel, SettinsPanel;
+    [SerializeField] GameObject MenuPanel, CreditsPanel, SettingsPanel;
 
     [SerializeField] GameObject Audio_Panel, Controls_Panel;
+    [SerializeField] Image AudioButtonImage, ControlsButtonImage;
+    [SerializeField] Color NormalButtonColor, clickButtonColor;
+
+    [SerializeField] Scrollbar controls_Scrollbar;
 
     private void Start()
     {
@@ -77,6 +81,21 @@ public class MainMenuManager : MonoBehaviour
 
     }
 
+    public void SettingsButton()
+    {
+        SettingsPanel.SetActive(true);
+        MenuPanel.SetActive(false);
+        CreditsPanel.SetActive(false);
+        Audio_Panel.SetActive(true);
+        Controls_Panel.SetActive(false);
+
+        AudioButtonImage.color = clickButtonColor;
+        ControlsButtonImage.color = NormalButtonColor;
+        Buttons[1].GetComponent<Image>().sprite = Mask_Textures_Color[2];
+        Buttons[1].GetComponent<Image>().color = HoverColor;
+        Buttons[1].transform.GetChild(0).GetChild(0).gameObject.GetComponent<Text>().color = initial_font_colors[1];
+    }
+
     public void CreditsButton()
     {
         MenuPanel.SetActive(false);
@@ -90,7 +109,7 @@ public class MainMenuManager : MonoBehaviour
     {
         MenuPanel.SetActive(true);
         CreditsPanel.SetActive(false);
-        SettinsPanel.SetActive(false);
+        SettingsPanel.SetActive(false);
     }
 
     public void QuitGame()
@@ -102,11 +121,18 @@ public class MainMenuManager : MonoBehaviour
     {
         Audio_Panel.SetActive(true);
         Controls_Panel.SetActive(false);
+        AudioButtonImage.color = clickButtonColor;
+        ControlsButtonImage.color = NormalButtonColor;
+
     }
 
-    public void SFXPanelButton()
+    public void ControlPanelButton()
     {
         Audio_Panel.SetActive(false);
         Controls_Panel.SetActive(true);
+        AudioButtonImage.color = NormalButtonColor;
+        ControlsButtonImage.color = clickButtonColor;
+
+        controls_Scrollbar.value = 1f;
     }
 }

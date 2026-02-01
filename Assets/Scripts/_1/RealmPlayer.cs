@@ -388,6 +388,7 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleWallClimb()
     {
+        if (RealmGameManager.instance.currentRealm != 3) return;
         if(should_climb_wall)
         {
             if(!canGrabLedge)
