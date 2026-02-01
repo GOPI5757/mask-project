@@ -72,6 +72,10 @@ public class RealmGameManager : MonoBehaviour
     [SerializeField] DepthOfField depthOf_field;
     [SerializeField] ColorAdjustments color_Adjustment;
 
+    [SerializeField] bool isPaused;
+
+    [SerializeField] GameObject PauseMenu;
+
     public static RealmGameManager instance;
 
     private void Awake()
@@ -80,10 +84,30 @@ public class RealmGameManager : MonoBehaviour
         {
             instance = this;
         }
+
+        if (TransferData.instance != null)
+        {
+            currentRealm = TransferData.instance.currentRealm;
+            prev_realm = TransferData.instance.prevRealm;
+            nextRealm = TransferData.instance.nextRealm;
+
+            masks_unlocked = TransferData.instance.masks_Unlocked;
+            Destroy(TransferData.instance.gameObject);
+        }
     }
 
     private void Start()
     {
+        //if(TransferData.instance != null)
+        //{
+        //    currentRealm = TransferData.instance.currentRealm;
+        //    prev_realm = TransferData.instance.prevRealm;
+        //    nextRealm = TransferData.instance.nextRealm;
+
+        //    masks_unlocked = TransferData.instance.masks_Unlocked;
+        //    Destroy(TransferData.instance.gameObject);
+        //}
+
         Background_Textues = GameObject.FindGameObjectsWithTag("BG");
         Camera.main.backgroundColor = CameraColors[currentRealm];
         for (int i = 0; i < Background_Textues.Length; i++)
@@ -102,6 +126,18 @@ public class RealmGameManager : MonoBehaviour
         HandleChange();
         HandleSlowToggle();
         HandleSMT();
+        HandlePause();
+    }
+
+    void HandlePause() 
+    {
+        if(Input.GetKeyDown(KeyCode.Escape))
+        {
+            isPaused = !isPaused;
+        }
+
+        PauseMenu.SetActive(isPaused);
+        Time.timeScale = isPaused ? 0f : 1f;
     }
 
     void HandleChange()
@@ -271,7 +307,7 @@ public class RealmGameManager : MonoBehaviour
     void HandleSlowToggle()
     {
         if (currentRealm != 2 || is_toggling_slowMode) return;
-        if(Input.GetKeyDown(KeyCode.T))
+        if(Input.GetKeyDown(KeyCode.Q))
         {
             is_slow_Toggled = !is_slow_Toggled;
             is_toggling_slowMode = true;
@@ -326,5 +362,22 @@ public class RealmGameManager : MonoBehaviour
             MaskBtn.transform.localScale = Vector3.one;
         } 
         nextRealm = -1;
+    }
+
+    public void ResumeGame()
+    {
+        isPaused = false;
+        Time.timeScale = 1f;
+        PauseMenu.SetActive(false);
+    }
+
+    public void SettingsGame()
+    {
+
+    }
+
+    public void QuitGame()
+    {
+        Application.Quit();
     }
 }

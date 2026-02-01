@@ -1,7 +1,8 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.UI;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class MainMenuManager : MonoBehaviour
 {
@@ -18,6 +19,10 @@ public class MainMenuManager : MonoBehaviour
     [SerializeField] Image CloseScreen;
     [SerializeField] float closeElapsedTime, closeTime, time_1, wait_time;
     [SerializeField] bool shouldClose;
+
+    [SerializeField] GameObject MenuPanel, CreditsPanel, SettinsPanel;
+
+    [SerializeField] GameObject Audio_Panel, Controls_Panel;
 
     private void Start()
     {
@@ -66,10 +71,42 @@ public class MainMenuManager : MonoBehaviour
     {
         shouldClose = true;
         CloseScreen.gameObject.SetActive(true);
+        Buttons[0].GetComponent<Image>().sprite = Mask_Textures_Color[0];
+        Buttons[0].GetComponent<Image>().color = HoverColor;
+        Buttons[0].transform.GetChild(0).GetChild(0).gameObject.GetComponent<Text>().color = initial_font_colors[0];
+
+    }
+
+    public void CreditsButton()
+    {
+        MenuPanel.SetActive(false);
+        CreditsPanel.SetActive(true);
+        Buttons[2].GetComponent<Image>().sprite = Mask_Textures_Color[2];
+        Buttons[2].GetComponent<Image>().color = HoverColor;
+        Buttons[2].transform.GetChild(0).GetChild(0).gameObject.GetComponent<Text>().color = initial_font_colors[2];
+    }
+
+    public void BackButton()
+    {
+        MenuPanel.SetActive(true);
+        CreditsPanel.SetActive(false);
+        SettinsPanel.SetActive(false);
     }
 
     public void QuitGame()
     {
         Application.Quit();
+    }
+
+    public void AudioPanelButton()
+    {
+        Audio_Panel.SetActive(true);
+        Controls_Panel.SetActive(false);
+    }
+
+    public void SFXPanelButton()
+    {
+        Audio_Panel.SetActive(false);
+        Controls_Panel.SetActive(true);
     }
 }

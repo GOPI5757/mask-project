@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections;
 using UnityEngine.UI;
 using TMPro;
+using UnityEngine.SceneManagement;
 
 public class RealmPlayer : MonoBehaviour
 {
@@ -153,10 +154,24 @@ public class RealmPlayer : MonoBehaviour
     [Header("Wall Climb")]
 
     [SerializeField] bool should_climb_wall, isClimbing;
+    [SerializeField] bool is_positioning_climbWall;
     [SerializeField] float x_offset;
     [SerializeField] Vector2 climbStartPos, climbEndPos;
     [SerializeField] float climb_elapsedTime, climb_Time;
-    [SerializeField] float climbForce;
+    [SerializeField] float climbSpeed;
+    [SerializeField] float vertical_movement;
+    [SerializeField] GameObject WallClimb_Object;
+
+    [Header("Ledge Grab")]
+
+    //[SerializeField] bool is_ledgeGrab;
+    [SerializeField] bool canGrabLedge;
+    [SerializeField] Vector2 GL_StartPos, GL_EndPos;
+    [SerializeField] Vector2 GL_point_1, GL_point_2;
+    [SerializeField] float GL_ElapsedTime, GL_MoveTime;
+    [SerializeField] int pointIndex;
+
+    [SerializeField] GameObject ledgeGrabObject;
 
     [Header("Game Start")]
 
@@ -170,12 +185,20 @@ public class RealmPlayer : MonoBehaviour
     [SerializeField] float camSize_elapsedTime_gs, camSize_time_gs;
     [SerializeField] float gs_time_3, gs_wait_time_3;
 
+    [SerializeField] bool is_transition;
+    [SerializeField] Transform trans_pos;
+    [SerializeField] Vector3 trans_camStartPos, trans_camEndPos;
+    [SerializeField] float trans_elapsedTime, trans_lerpTime; 
+
     [Header("GameFinish")]
 
     [SerializeField] bool hasGameFinished = false;
     [SerializeField] float GameFinish_time_1, GameFinish_wait_time_1;
     [SerializeField] Vector3 GameFinish_camStartPos, GameFinish_camEndPos;
     [SerializeField] float GameFinishElapsedTime, GameFinishTime;
+    [SerializeField] int NextSceneToLoad;
+
+    [SerializeField] GameObject TransferDataObject;
 
     private void Start()
     {
@@ -184,6 +207,13 @@ public class RealmPlayer : MonoBehaviour
         SetMaskShiftInitials();
         MaskStartRevealColor = new Color(0, 0, 0, 1);
         MaskEndRevealColor = new Color(1, 1, 1, 1);
+        for(int i = 0; i < Masks.Length; i++)
+        {
+            if (i + 1 <= RealmGameManager.instance.masks_unlocked)
+            {
+                Masks[i].GetComponent<Image>().color = MaskEndRevealColor;
+            }
+        }
         //Time.timeScale = 0.2f;
         animator = transform.GetChild(0).gameObject.GetComponent<Animator>();
 
@@ -191,9 +221,22 @@ public class RealmPlayer : MonoBehaviour
         initialSpritePosition = transform.GetChild(0).transform.localPosition;
         if(!hasGameStarted)
         {
-            FadeOutImage.gameObject.SetActive(true);
-            Camera.main.orthographicSize = gs_startCamSize;
+            if(!is_transition)
+            {
+                FadeOutImage.gameObject.SetActive(true);
+                Camera.main.orthographicSize = gs_startCamSize;
+            }
         }
+
+        if(is_transition)
+        {
+            trans_camStartPos = new Vector3(trans_pos.position.x, transform.position.y, -10f);
+            trans_camEndPos = new Vector3(transform.position.x, transform.position.y, -10f);
+
+            Camera.main.transform.position = trans_camStartPos;
+        }
+
+        //Time.timeScale = 0.2f;
 
     }
 
@@ -216,7 +259,7 @@ public class RealmPlayer : MonoBehaviour
 
     private void Update()
     {
-        if(hasGameStarted)
+        if(hasGameStarted && !isClimbing)
         {
             if (!isClicking_MS_Tab && !isDashing && !is_obtaining_Mask)
             {
@@ -235,15 +278,15 @@ public class RealmPlayer : MonoBehaviour
             HandleTutorialFadeOut();
             HandleDead();
             HandleWallJump();
-            HandleWallClimb();
         }
+        HandleWallClimb();
         HandleHasGameStarted();
         HandleGameFinish();
     }
 
     private void LateUpdate()
     {
-        if (is_dead || hasGameFinished) return;
+        if (is_dead || hasGameFinished || !hasGameStarted) return;
         Camera.main.transform.position = new Vector3(transform.position.x, transform.position.y, -10f);
     }
 
@@ -267,7 +310,12 @@ public class RealmPlayer : MonoBehaviour
 
                 if(t >= 1f)
                 {
-
+                    GameObject tdata = Instantiate(TransferDataObject, transform.position, Quaternion.identity);
+                    tdata.GetComponent<TransferData>().currentRealm = RealmGameManager.instance.currentRealm;
+                    tdata.GetComponent<TransferData>().nextRealm = RealmGameManager.instance.nextRealm;
+                    tdata.GetComponent<TransferData>().prevRealm = RealmGameManager.instance.prev_realm;
+                    tdata.GetComponent<TransferData>().masks_Unlocked = RealmGameManager.instance.masks_unlocked;
+                    SceneManager.LoadScene(NextSceneToLoad);
                 }
             }
         }
@@ -277,43 +325,58 @@ public class RealmPlayer : MonoBehaviour
     {
         if(!hasGameStarted)
         {
-            float t = fadeOut_elapsedTime / fadeOutTime_GS;
-            Color newColor = Color.Lerp(new Color(0, 0, 0, 1), new Color(0, 0, 0, 0), t);
-            fadeOut_elapsedTime += Time.deltaTime;
-            FadeOutImage.color = newColor;
-            if(t >= 1)
+            if(is_transition)
             {
-                gs_time_1 += Time.deltaTime;
-                if(gs_time_1 >= gs_wait_time_1)
+                float t = trans_elapsedTime / trans_lerpTime;
+                Vector3 newCamPos = Vector3.Lerp(trans_camStartPos, trans_camEndPos, t);
+                Camera.main.transform.position = newCamPos;
+                trans_elapsedTime += Time.deltaTime;
+                if(t >= 1)
                 {
-                    float t_1 = playerFadeIn_elapsedTime / fadeinTime_GS;
-                    Color newColor_1 = Color.Lerp(new Color(1, 1, 1, 0), new Color(1, 1, 1, 1), t_1);
-                    transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color = newColor_1;
-
-                    playerFadeIn_elapsedTime += Time.deltaTime;
-                    if(t_1 >= 1f)
+                    hasGameStarted = true;
+                    trans_elapsedTime = 0f;
+                }
+            }
+            else
+            {
+                float t = fadeOut_elapsedTime / fadeOutTime_GS;
+                Color newColor = Color.Lerp(new Color(0, 0, 0, 1), new Color(0, 0, 0, 0), t);
+                fadeOut_elapsedTime += Time.deltaTime;
+                FadeOutImage.color = newColor;
+                if (t >= 1)
+                {
+                    gs_time_1 += Time.deltaTime;
+                    if (gs_time_1 >= gs_wait_time_1)
                     {
-                        gs_time_2 += Time.deltaTime;
-                        if(gs_time_2 >= gs_wait_time_2)
+                        float t_1 = playerFadeIn_elapsedTime / fadeinTime_GS;
+                        Color newColor_1 = Color.Lerp(new Color(1, 1, 1, 0), new Color(1, 1, 1, 1), t_1);
+                        transform.GetChild(0).gameObject.GetComponent<SpriteRenderer>().color = newColor_1;
+
+                        playerFadeIn_elapsedTime += Time.deltaTime;
+                        if (t_1 >= 1f)
                         {
-                            float t_2 = camSize_elapsedTime_gs / camSize_time_gs;
-                            float newCamSize = Mathf.Lerp(gs_startCamSize, gs_endCamSize, t_2);
-                            Camera.main.orthographicSize = newCamSize;
-                            
-                            camSize_elapsedTime_gs += Time.deltaTime;
-                            if(t_2 >= 1f)
+                            gs_time_2 += Time.deltaTime;
+                            if (gs_time_2 >= gs_wait_time_2)
                             {
-                                gs_time_3 += Time.deltaTime;
-                                if(gs_time_3 >= gs_wait_time_3)
+                                float t_2 = camSize_elapsedTime_gs / camSize_time_gs;
+                                float newCamSize = Mathf.Lerp(gs_startCamSize, gs_endCamSize, t_2);
+                                Camera.main.orthographicSize = newCamSize;
+
+                                camSize_elapsedTime_gs += Time.deltaTime;
+                                if (t_2 >= 1f)
                                 {
-                                    Destroy(FadeOutImage.gameObject);
-                                    gs_time_1 = 0f;
-                                    gs_time_2 = 0f;
-                                    gs_time_1 = 3f;
-                                    fadeOut_elapsedTime = 0f;
-                                    playerFadeIn_elapsedTime = 0f;
-                                    camSize_elapsedTime_gs = 0f;
-                                    hasGameStarted = true;
+                                    gs_time_3 += Time.deltaTime;
+                                    if (gs_time_3 >= gs_wait_time_3)
+                                    {
+                                        Destroy(FadeOutImage.gameObject);
+                                        gs_time_1 = 0f;
+                                        gs_time_2 = 0f;
+                                        gs_time_1 = 3f;
+                                        fadeOut_elapsedTime = 0f;
+                                        playerFadeIn_elapsedTime = 0f;
+                                        camSize_elapsedTime_gs = 0f;
+                                        hasGameStarted = true;
+                                    }
                                 }
                             }
                         }
@@ -325,7 +388,74 @@ public class RealmPlayer : MonoBehaviour
 
     void HandleWallClimb()
     {
+        if(should_climb_wall)
+        {
+            if(!canGrabLedge)
+            {
+                if (Input.GetKeyDown(KeyCode.E))
+                {
+                    is_positioning_climbWall = true;
+                    climbStartPos = transform.position;
+                    wallClimbCheck wc_check = WallClimb_Object.transform.GetChild(0).gameObject.GetComponent<wallClimbCheck>();
+                    climbEndPos = new Vector2(WallClimb_Object.transform.GetChild(0).transform.position.x + (wc_check.is_left ? -x_offset : x_offset), transform.position.y);
 
+                    transform.eulerAngles = new Vector3(0f, wc_check.is_left ? 0f : 180f, 0f);
+                    Canvas.transform.localEulerAngles = new Vector3(0f, wc_check.is_left ? 0f : 180f, 0f);
+                    is_flipX = !wc_check.is_left;
+                }
+
+                if (is_positioning_climbWall && !isClimbing)
+                {
+                    float t = climb_elapsedTime / climb_Time;
+                    Vector2 newPos = Vector2.Lerp(climbStartPos, climbEndPos, t);
+                    transform.position = newPos;
+                    climb_elapsedTime += Time.deltaTime;
+                    if (t >= 1f)
+                    {
+                        isClimbing = true;
+                        rb.gravityScale = 0f;
+                        climb_elapsedTime = 0f;
+                    }
+                }
+
+                if (isClimbing)
+                {
+                    vertical_movement = Input.GetAxis("Vertical");
+                    animator.SetBool("canClimbUp", vertical_movement > 0f);
+                    animator.SetBool("canClimbDown", vertical_movement <= 0f);
+                }
+            } else
+            {
+                animator.SetBool("is_ledgeGrab", true);
+                float t = GL_ElapsedTime / GL_MoveTime;
+                Vector2 newPos = Vector2.Lerp(GL_StartPos, GL_EndPos, t);
+                transform.position = newPos;
+                GL_ElapsedTime += Time.deltaTime;
+
+                if(t >= 1)
+                {
+                    pointIndex++;
+                    GL_ElapsedTime = 0f;
+                    if(pointIndex >= 2)
+                    {
+                        isClimbing = false;
+                        canGrabLedge = false;
+                        should_climb_wall = false;
+                        pointIndex = 0;
+                        animator.SetBool("is_ledgeGrab", false);
+                        animator.SetBool("canClimbUp", false);
+                        animator.SetBool("canClimbDown", false);
+                        rb.gravityScale = initialGravityScale;
+                        is_positioning_climbWall = false;
+                    } else
+                    {
+                        GL_StartPos = transform.position;
+                        GL_EndPos = GL_point_2;
+                    }
+                }
+            }
+
+        }
     }
 
     void HandleDead()
@@ -930,7 +1060,13 @@ public class RealmPlayer : MonoBehaviour
                 DashElapsedTime = 0f;
             }
         }
-        if(!canSwing && !is_swinging && !isDashing && !is_wall)
+
+        if(isClimbing && !canGrabLedge)
+        {
+            rb.linearVelocityY = vertical_movement * climbSpeed;
+        }
+
+        if(!canSwing && !is_swinging && !isDashing && !is_wall && !isClimbing)
         {
             if (!isHoldingSomething)
             {
@@ -1055,6 +1191,27 @@ public class RealmPlayer : MonoBehaviour
             GameFinish_camEndPos = new Vector3(collision.gameObject.transform.parent.transform.GetChild(1).transform.position.x, Camera.main.transform.position.y, -10f);
             x = 0f;
         }
+
+        if(collision.gameObject.tag == "wall_climb")
+        {
+            should_climb_wall = true;
+            WallClimb_Object = collision.gameObject.transform.parent.transform.parent.gameObject;
+        }
+
+        if(collision.gameObject.tag == "ledge_grab")
+        {
+            if(isClimbing)
+            {
+                canGrabLedge = true;
+                ledgeGrabObject = collision.gameObject;
+                GL_point_1 = ledgeGrabObject.transform.GetChild(0).transform.position;
+                GL_point_2 = ledgeGrabObject.transform.GetChild(1).transform.position;
+                rb.linearVelocity = new Vector2(0f, 0f);
+                vertical_movement = 0f;
+                GL_StartPos = transform.position;
+                GL_EndPos = GL_point_1;
+            }
+        }
     }
 
     private void OnTriggerExit2D(Collider2D collision)
@@ -1077,6 +1234,14 @@ public class RealmPlayer : MonoBehaviour
             {
                 collision.gameObject.GetComponent<Mask>().ResetValues(false);
                 CurrentMaskToReveal = null;
+            }
+        }
+
+        if (collision.gameObject.tag == "wall_climb")
+        {
+            if(!canGrabLedge && !isClimbing)
+            {
+                should_climb_wall = false;
             }
         }
     }

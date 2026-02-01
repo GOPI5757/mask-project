@@ -19,6 +19,8 @@ TagManager:
   - safePoint
   - reset_block
   - finishDoor
+  - wall_climb
+  - ledge_grab
   layers:
   - Default
   - TransparentFX
